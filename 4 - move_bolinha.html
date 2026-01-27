@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <title>EyeClick - Experimento</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="traducao.js"></script>
+  
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 180px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+    }
+    .instruction {
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .instruction img {
+      width: 80px;
+      height: auto;
+      margin-bottom: 4px;
+    }
+    .instruction p {
+      font-size: 0.9em;
+      margin: 0;
+    }
+    #container {
+      flex: 1;
+      position: relative;
+    }
+    #eyeCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #video {
+      display: none;
+    }
+    #instructionText {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.2em;
+      color: #fff;
+      text-align: center;
+      z-index: 20;
+    }
+    #nextButton {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.5em;
+      background: #444;
+      color: #fff;
+      padding: 15px 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: none;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar"> 
+    <h3 id="instructionsTitle">Instruções</h3> 
+    <div class="instruction"><img src="assets/movimentação_baixo.png"><p id="text_down">Baixo</p></div> 
+    <div class="instruction"><img src="assets/movimentação_cima.png"><p id="text_up">Cima</p></div> 
+    <div class="instruction"><img src="assets/movimentação_direita.png"><p id="text_right">Direita</p></div> 
+    <div class="instruction"><img src="assets/movimentação_esquerda.png"><p id="text_left">Esquerda</p></div> 
+  </div>
+
+  <div id="container">
+    <p id="instructionText">Mova a bolinha para dentro dos quadrados vermelhos</p>
+    <canvas id="eyeCanvas"></canvas>
+    <video id="video" autoplay muted playsinline></video>
+    <button id="nextButton">Próxima Etapa</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("eyeCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const valoresCalibrados = JSON.parse(localStorage.getItem("valoresCalibrados")) || {};
+    let posicaoMouse = { x: 0.5, y: 0.5 };
+    const raioBolinha = 20;
+    const tamanhoQuadrado = raioBolinha * 6;
+    let quadradoAtual = 0;
+    let inicioQuadrado = null;
+    let tempos = [];
+
+    const quadradosFixos = [
+      { x: 50, y: 50 },
+      { x: canvas.width - 150, y: 50 },
+      { x: 50, y: canvas.height - 150 },
+      { x: canvas.width - 150, y: canvas.height - 150 },
+      { x: canvas.width / 2 - 75, y: 50 }
+    ];
+
+    function calcularEAR(coords) {
+      try {
+        const A = Math.hypot(coords[159][0]-coords[145][0], coords[159][1]-coords[145][1]);
+        const B = Math.hypot(coords[160][0]-coords[144][0], coords[160][1]-coords[144][1]);
+        const C = Math.hypot(coords[33][0]-coords[133][0], coords[33][1]-coords[133][1]);
+        const earDireito = (A + B) / (2.0 * C);
+        const D = Math.hypot(coords[386][0]-coords[374][0], coords[386][1]-coords[374][1]);
+        const E = Math.hypot(coords[387][0]-coords[373][0], coords[387][1]-coords[373][1]);
+        const F = Math.hypot(coords[362][0]-coords[263][0], coords[362][1]-coords[263][1]);
+        const earEsquerdo = (D + E) / (2.0 * F);
+        return { direito: earDireito, esquerdo: earEsquerdo };
+      } catch { return null; }
+    }
+
+    function movimentoHorizontal(coords) {
+      try {
+        return {
+          left_eye: (coords[468][0]-coords[144][0]) / (coords[153][0]-coords[144][0]),
+          right_eye: (coords[473][0]-coords[373][0]) / (coords[380][0]-coords[373][0])
+        };
+      } catch {
+        return { left_eye: null, right_eye: null };
+      }
+    }
+
+    function movimentoVertical(coords) {
+      try {
+        return {
+          left_eye: (coords[468][1]-coords[189][1]) / (coords[173][1]-coords[189][1]),
+          right_eye: (coords[473][1]-coords[413][1]) / (coords[463][1]-coords[413][1])
+        };
+      } catch {
+        return { left_eye: null, right_eye: null };
+      }
+    }
+
+    function moverMousePorDirecao(ctx, largura, altura, eyeVertical, eyeHorizontal, ear, config, velocidade = 0.0009) {
+      const centroH = config["olhar_left_eye_horizontal_centro"];
+      const centroV = config["olhar_left_eye_vertical_centro"];
+      const tolerancia = 0.02;
+
+      const valorHorizontal = eyeHorizontal?.left_eye;
+      const valorVertical = eyeVertical?.left_eye;
+      const earDireito = ear?.direito;
+      const earEsquerdo = ear?.esquerdo;
+
+      if (earDireito != null && earEsquerdo != null && earEsquerdo <= 0.12 && earDireito > 0.12) {
+        if (valorVertical < centroV - tolerancia) posicaoMouse.y -= velocidade;
+        else if (valorVertical > centroV + tolerancia) posicaoMouse.y += velocidade;
+
+        if (valorHorizontal < centroH - tolerancia) posicaoMouse.x += velocidade;
+        else if (valorHorizontal > centroH + tolerancia) posicaoMouse.x -= velocidade;
+
+        posicaoMouse.x = Math.max(0.0, Math.min(posicaoMouse.x, 1.0));
+        posicaoMouse.y = Math.max(0.0, Math.min(posicaoMouse.y, 1.0));
+      }
+
+      let xPixel = Math.floor(posicaoMouse.x * largura);
+      let yPixel = Math.floor(posicaoMouse.y * altura);
+
+      ctx.clearRect(0, 0, largura, altura);
+
+      if (quadradoAtual < quadradosFixos.length) {
+        const q = quadradosFixos[quadradoAtual];
+        ctx.fillStyle = "red";
+        ctx.fillRect(q.x, q.y, tamanhoQuadrado, tamanhoQuadrado);
+
+        if (
+          xPixel - raioBolinha > q.x &&
+          xPixel + raioBolinha < q.x + tamanhoQuadrado &&
+          yPixel - raioBolinha > q.y &&
+          yPixel + raioBolinha < q.y + tamanhoQuadrado
+        ) {
+          const tempo = Math.floor((Date.now() - inicioQuadrado) / 1000);
+          tempos.push({ numero: quadradoAtual + 1, tempo: tempo, x: q.x, y: q.y });
+          quadradoAtual++;
+          inicioQuadrado = Date.now();
+        }
+      } else {
+        document.getElementById("nextButton").style.display = "block";
+      }
+
+      ctx.fillStyle = "yellow";
+      ctx.beginPath();
+      ctx.arc(xPixel, yPixel, raioBolinha, 0, 2 * Math.PI);
+            ctx.fill();
+    }
+
+    // Inicializa FaceMesh
+    function iniciarFaceMesh() {
+      const faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      faceMesh.onResults((results) => {
+        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+          window.coordenadasAtuais = null;
+          return;
+        }
+        const rosto = results.multiFaceLandmarks[0];
+        const coords = {};
+        [33,133,159,160,145,144,386,374,387,373,362,263,468,473,189,173,413,463,153,380].forEach(idx => {
+          const p = rosto[idx];
+          coords[idx] = [p.x * canvas.width, p.y * canvas.height];
+        });
+        window.coordenadasAtuais = coords;
+      });
+
+      const videoElement = document.getElementById("video");
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await faceMesh.send({ image: videoElement });
+        },
+        width: 640,
+        height: 480
+      });
+      camera.start();
+      inicioQuadrado = Date.now(); // começa a contar tempo do primeiro quadrado
+    }
+
+    // Loop principal
+    function loop() {
+      if (window.coordenadasAtuais) {
+        const h = movimentoHorizontal(window.coordenadasAtuais);
+        const v = movimentoVertical(window.coordenadasAtuais);
+        const ear = calcularEAR(window.coordenadasAtuais);
+
+        moverMousePorDirecao(ctx, canvas.width, canvas.height, v, h, ear, valoresCalibrados);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // Botão de próxima etapa
+    document.getElementById("nextButton").addEventListener("click", () => {
+      // salva resultados no localStorage
+      localStorage.setItem("resultadosExperimento", JSON.stringify(tempos));
+      // redireciona para a página da tabela
+      location.href = "5 - resultados.html";
+    });
+
+    // Inicializa FaceMesh e começa o loop
+    iniciarFaceMesh();
+    loop();
+
+    // Tradução inicial dos textos
+    document.addEventListener("DOMContentLoaded", () => {
+      const lang = localStorage.getItem("selectedLanguage") || "pt";
+      updateTexts(lang);
+      document.getElementById("instructionText").textContent = translations[lang].instruction_move_ball;
+      document.getElementById("nextButton").textContent = translations[lang].next_button_experiment;
+    });
+  </script>
+</body>
+</html>

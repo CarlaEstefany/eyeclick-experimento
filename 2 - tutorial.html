@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tutorial - EyeClick</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="light">
+  <header class="top-bar">
+    <div class="logo">
+      <span class="eye-icon">👁️</span>
+      <span class="title" id="logoTitle">EyeClick</span>
+    </div>
+    <div class="selectors">
+      <select id="language">
+        <option value="pt">🇧🇷 Português</option>
+        <option value="en">🇺🇸 English</option>
+        <option value="es">🇪🇸 Español</option>
+      </select>
+      <select id="theme">
+        <option value="light">🌞 Claro</option>
+        <option value="dark">🌙 Escuro</option>
+        <option value="daltonic">👓 Daltônico</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="tutorial-section">
+    <div id="movimentacao" class="tutorial-block">
+      <h2 id="movementTitle">Movimentação</h2>
+      <div class="grid-2x2">
+        <div class="tutorial-item">
+          <img src="assets/movimentação_cima.png" class="tutorial-img" />
+          <p class="caption" id="caption_up"></p>
+        </div>
+        <div class="tutorial-item">
+          <img src="assets/movimentação_baixo.png" class="tutorial-img" />
+          <p class="caption" id="caption_down"></p>
+        </div>
+        <div class="tutorial-item">
+          <img src="assets/movimentação_esquerda.png" class="tutorial-img" />
+          <p class="caption" id="caption_left"></p>
+        </div>
+        <div class="tutorial-item">
+          <img src="assets/movimentação_direita.png" class="tutorial-img" />
+          <p class="caption" id="caption_right"></p>
+        </div>
+      </div>
+      <button id="nextBtn" class="nav-button">Próximo ▶</button>
+    </div>
+
+    <div id="acoes" class="tutorial-block" style="display: none;">
+      <h2 id="actionsTitle">Ações</h2>
+      <div class="grid-2x2">
+        <div class="tutorial-item">
+          <img src="assets/clique_esquerdo.png" class="tutorial-img" />
+          <p class="caption" id="caption_left_click"></p>
+        </div>
+        <div class="tutorial-item">
+          <img src="assets/clique_direito.png" class="tutorial-img" />
+          <p class="caption" id="caption_right_click"></p>
+        </div>
+        <div class="tutorial-item">
+          <img src="assets/rolagem_cima.png" class="tutorial-img" />
+          <p class="caption" id="caption_scroll_up"></p>
+        </div>
+        <div class="tutorial-item">
+          <img src="assets/rolagem_baixo.png" class="tutorial-img" />
+          <p class="caption" id="caption_scroll_down"></p>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button id="prevBtn" class="nav-button">◀ Anterior</button>
+        <button id="nextBtn2" class="nav-button">Próximo ▶</button>
+      </div>
+    </div>
+
+    <!-- Etapa Tutorial Calibração -->
+    <div id="calibracao" class="tutorial-block" style="display: none;">
+        <h2 id="calibrationTitle">Calibração</h2>
+        <ul id="calibrationList" class="calibration-list"></ul>
+
+        <img src="assets/calibracao.png" class="calibration-img" alt="Imagem explicando as etapas da calibração" />
+
+     <!-- Botão centralizado --> 
+    <div class="calibration-actions"> 
+        <button id="startCalibrationBtn" class="nav-button" onclick="location.href='3 - calibracao.html'"> 
+        ▶ Iniciar Calibração 
+        </button> 
+    </div>
+    </div>
+
+  </main>
+
+  <script src="traducao.js"></script>
+  <script>
+    document.getElementById('nextBtn').addEventListener('click', function() {
+      document.getElementById('movimentacao').style.display = 'none';
+      document.getElementById('acoes').style.display = 'block';
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', function() {
+      document.getElementById('acoes').style.display = 'none';
+      document.getElementById('movimentacao').style.display = 'block';
+    });
+
+
+    document.getElementById('nextBtn2').addEventListener('click', function() {
+      document.getElementById('acoes').style.display = 'none';
+      document.getElementById('calibracao').style.display = 'block';
+    });
+
+  </script>
+</body>
+</html>

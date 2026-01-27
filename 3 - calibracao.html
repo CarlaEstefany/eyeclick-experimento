@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="traducao.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    h1 { margin: 20px 0; }
+    #video { display: none; }
+    canvas {
+      width: 540px; height: 400px;
+      background: #111; border: 2px solid #333;
+    }
+    .step { display: none; }
+    .step.active { display: block; }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      background: #444;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .feedback {
+      font-size: 1em;
+      margin-left: 10px;
+    }
+    #nextBtn1, #nextBtn2, #nextBtn3 {
+      display: none;
+      background: #007acc;
+    }
+    /* Etapa 3: posicionamento dos botões */
+    #step3 {
+      position: relative;
+      width: 540px;
+      height: 400px;
+    }
+    #captureBtn3 {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+    }
+    #nextBtn3 {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+    }
+    #instrucao3 {
+      position: absolute;
+      top: 8px;
+      width: 100%;
+      text-align: center;
+      font-size: 0.9em;
+      color: #fff;
+      pointer-events: none;
+    }
+    .sidebar {
+      width: 140px;
+      padding: 8px;
+      background: #111;
+      font-size: 0.8em;
+    }
+    .instruction img {
+      width: 100px;
+    }
+
+  </style>
+</head>
+<body>
+  
+  <!-- Etapa 1 -->
+  <div id="step1" class="step active">
+    <h2 id="step1Title">Etapa 1: Distância da câmera</h2>
+
+    <video id="video" width="540" height="400" autoplay muted></video>
+    <canvas id="output" width="540" height="400"></canvas>
+    <div class="controls">
+      <button id="captureBtn1"><span id="captureBtn1Text">Capturar</span></button>
+      <span id="feedback1" class="feedback"></span>
+      <button id="nextBtn1"><span id="nextBtn1Text">Próxima etapa ▶</span></button>
+    </div>
+  </div>
+
+  <!-- Etapa 2 -->
+  <div id="step2" class="step">
+    <h2 id="step2Title">Etapa 2: Proporção dos olhos</h2>
+
+    <div style="margin-bottom: 5px; display: flex; justify-content: center; gap: 20px;">
+      <span id="feedbackOpen" class="feedback"></span>
+      <span id="feedbackClosed" class="feedback"></span>
+    </div>
+
+    <canvas id="output2" width="540" height="400"></canvas>
+
+    <div class="controls" style="margin-top: 12px;">
+      <button id="captureOpen"><span id="captureOpenText">Capturar olhos abertos</span></button>
+      <button id="captureClosed"><span id="captureClosedText">Capturar olhos fechados</span></button>
+      <button id="nextBtn2"><span id="nextBtn2Text">Próxima etapa ▶</span></button>
+    </div>
+  </div>
+
+
+  <!-- Etapa 3 -->
+    <div id="step3" class="step" style="position:relative; width:100vw; height:100vh;">
+    <!-- Texto de instrução -->
+    <div id="instrucao3" style="position:absolute; top:20px; width:100%; text-align:center; font-size:1.2em; color:#fff;">
+    </div>
+
+    <!-- Canvas tela cheia -->
+    <canvas id="stage3" width="1920" height="1080" style="width:100%; height:100%;"></canvas>
+
+    <!-- Botões -->
+    <button id="captureBtn3"><span id="captureBtn3Text">Capturar</span></button>
+    <button id="nextBtn3"><span id="nextBtn3Text">Próxima etapa ▶</span></button>
+    </div>
+ 
+
+    <!-- Etapa 4 -->
+    <div id="step4" class="step" style="position: relative; width: 100vw; height: 100vh; display: flex;">
+      
+      <!-- Área principal com canvas e botões -->
+      <div style="flex: 1; position: relative;">
+        <canvas id="stage4" style="width: 100%; height: 100%;"></canvas>
+        <div id="finalBtns" style="position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 20px;">
+          <button id="finalizarBtn"><span id="finalizarBtnText">Finalizar calibração</span></button>
+          <button id="repetirBtn"><span id="repetirBtnText">Repetir calibração</span></button>
+        </div>
+      </div>
+
+      <!-- Sidebar à direita -->
+      <div class="sidebar" style="width: 100px; background: #111; padding: 10px;">
+        <h3 id="instructionsTitle">Instruções</h3>
+        <div class="instruction"><img src="assets/movimentação_baixo.png"><p id="text_down">Baixo</p></div>
+        <div class="instruction"><img src="assets/movimentação_cima.png"><p id="text_up">Cima</p></div>
+        <div class="instruction"><img src="assets/movimentação_direita.png"><p id="text_right">Direita</p></div>
+        <div class="instruction"><img src="assets/movimentação_esquerda.png"><p id="text_left">Esquerda</p></div>
+      </div>
+
+    </div>
+
+
+
+  <script>
+    // Valores globais
+    window.valoresCalibrados = {
+      distancia_minima: null,
+      ear_aberto: null,
+      ear_fechado: null
+    };
+    window.coordenadasAtuais = null;
+
+    // Função de calcular proximidade
+    function calcularProximidade(coordenadas) {
+      if (coordenadas[33] && coordenadas[133]) {
+        const [x33, y33] = coordenadas[33];
+        const [x133, y133] = coordenadas[133];
+        return Math.sqrt((x33 - x133) ** 2 + (y33 - y133) ** 2);
+      }
+      return null;
+    }
+
+    // Função de calcular EAR
+    function calcularEAR(coordenadas) {
+      try {
+        const A = Math.hypot(coordenadas[159][0] - coordenadas[145][0], coordenadas[159][1] - coordenadas[145][1]);
+        const B = Math.hypot(coordenadas[160][0] - coordenadas[144][0], coordenadas[160][1] - coordenadas[144][1]);
+        const C = Math.hypot(coordenadas[33][0] - coordenadas[133][0], coordenadas[33][1] - coordenadas[133][1]);
+        const earDireito = (A + B) / (2.0 * C);
+
+        const D = Math.hypot(coordenadas[386][0] - coordenadas[374][0], coordenadas[386][1] - coordenadas[374][1]);
+        const E = Math.hypot(coordenadas[387][0] - coordenadas[373][0], coordenadas[387][1] - coordenadas[373][1]);
+        const F = Math.hypot(coordenadas[362][0] - coordenadas[263][0], coordenadas[362][1] - coordenadas[263][1]);
+        const earEsquerdo = (D + E) / (2.0 * F);
+
+        return { direito: earDireito, esquerdo: earEsquerdo };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Movimento horizontal ocular
+    function movimentoHorizontal(coordenadas) {
+      try {
+        const leftInner = coordenadas[144][0];
+        const leftOuter = coordenadas[153][0];
+        const leftPupil = coordenadas[468][0];
+        const leftEyeHorizontal = (leftPupil - leftInner) / (leftOuter - leftInner);
+
+        const rightInner = coordenadas[373][0];
+        const rightOuter = coordenadas[380][0];
+        const rightPupil = coordenadas[473][0];
+        const rightEyeHorizontal = (rightPupil - rightInner) / (rightOuter - rightInner);
+
+        return { left_eye: leftEyeHorizontal, right_eye: rightEyeHorizontal };
+      } catch (e) {
+        return { left_eye: null, right_eye: null };
+      }
+    }
+
+    // Movimento vertical ocular
+    function movimentoVertical(coordenadas) {
+      try {
+        const leftInner = coordenadas[189][1];
+        const leftOuter = coordenadas[173][1];
+        const leftPupil = coordenadas[468][1];
+        const denomL = leftOuter - leftInner;
+        const leftEyeVertical = denomL === 0 ? null : (leftPupil - leftInner) / denomL;
+
+        const rightInner = coordenadas[413][1];
+        const rightOuter = coordenadas[463][1];
+        const rightPupil = coordenadas[473][1];
+        const denomR = rightOuter - rightInner;
+        const rightEyeVertical = denomR === 0 ? null : (rightPupil - rightInner) / denomR;
+
+        return { left_eye: leftEyeVertical, right_eye: rightEyeVertical };
+      } catch (e) {
+        return { left_eye: null, right_eye: null };
+      }
+    }
+
+    // Captura distância — Etapa 1
+    function capturarDistancia() {
+      const lang = localStorage.getItem('selectedLanguage') || 'pt';
+      const coords = window.coordenadasAtuais;
+
+      if (!coords) {
+        document.getElementById('feedback1').textContent = translations[lang].feedback_no_face;
+        return;
+      }
+
+      const distancia = calcularProximidade(coords);
+      if (distancia && distancia > 30) {
+        window.valoresCalibrados.distancia_minima = distancia;
+        document.getElementById('feedback1').textContent =
+          `${translations[lang].feedback_distance_ok} (${distancia.toFixed(2)})`;
+        document.getElementById('nextBtn1').style.display = 'inline';
+      } else {
+        document.getElementById('feedback1').textContent = translations[lang].feedback_distance_close;
+        document.getElementById('nextBtn1').style.display = 'none';
+      }
+    }
+
+    // Etapa 2 — olhos
+    function capturarOlhosAbertos() {
+      const lang = localStorage.getItem('selectedLanguage') || 'pt';
+      const coords = window.coordenadasAtuais;
+
+      if (!coords) {
+        document.getElementById('feedbackOpen').textContent = translations[lang].feedback_no_face;
+        return;
+      }
+
+      const ear = calcularEAR(coords);
+      if (ear) {
+        window.valoresCalibrados.ear_aberto = (ear.direito + ear.esquerdo) / 2;
+        document.getElementById('feedbackOpen').textContent =
+          `${translations[lang].feedback_open_ok} (EAR: ${window.valoresCalibrados.ear_aberto.toFixed(3)})`;
+        verificarEtapa2();
+      }
+    }
+
+    function capturarOlhosFechados() {
+      const lang = localStorage.getItem('selectedLanguage') || 'pt';
+      const coords = window.coordenadasAtuais;
+
+      if (!coords) {
+        document.getElementById('feedbackClosed').textContent = translations[lang].feedback_no_face;
+        return;
+      }
+
+      const ear = calcularEAR(coords);
+      if (ear) {
+        window.valoresCalibrados.ear_fechado = (ear.direito + ear.esquerdo) / 2;
+        document.getElementById('feedbackClosed').textContent =
+          `${translations[lang].feedback_closed_ok} (EAR: ${window.valoresCalibrados.ear_fechado.toFixed(3)})`;
+        verificarEtapa2();
+      }
+    }
+
+    function verificarEtapa2() {
+      if (window.valoresCalibrados.ear_aberto && window.valoresCalibrados.ear_fechado) {
+        document.getElementById('nextBtn2').style.display = 'inline';
+      }
+    }
+
+    // Controle de etapas
+    function nextStep(n) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step' + n).classList.add('active');
+    }
+
+    // Inicializa FaceMesh
+    function iniciarFaceMesh() {
+      const faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      const videoElement = document.getElementById("video");
+      const canvasElement = document.getElementById("output");
+      const ctx = canvasElement.getContext("2d");
+
+      faceMesh.onResults((results) => {
+        ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        if (results.image) {
+          ctx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+        }
+        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+          window.coordenadasAtuais = null;
+          return;
+        }
+
+        const rosto = results.multiFaceLandmarks[0];
+        const coordenadas = {};
+        const pontosDesejados = [
+          33,133,159,160,145,144,386,374,387,373,362,263,
+          468,473,189,173,413,463,153,380
+        ];
+        pontosDesejados.forEach(idx => {
+          const p = rosto[idx];
+          coordenadas[idx] = [p.x * canvasElement.width, p.y * canvasElement.height];
+        });
+
+        // Atualiza coordenadas globais
+        window.coordenadasAtuais = coordenadas;
+
+        // Desenha imagem da câmera no canvas da etapa ativa
+        if (results.image) {
+          if (document.getElementById("step1").classList.contains("active")) {
+            ctx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+          }
+          if (document.getElementById("step2").classList.contains("active")) {
+            const output2 = document.getElementById("output2");
+            const ctx2 = output2.getContext("2d");
+            ctx2.clearRect(0, 0, output2.width, output2.height);
+            ctx2.drawImage(results.image, 0, 0, output2.width, output2.height);
+          }
+          // Etapa 3 não mostra vídeo/câmera — só bolinha animada
+        }
+      });
+
+      const camera = new Camera(videoElement, {
+        onFrame: async () => { await faceMesh.send({ image: videoElement }); },
+        width: 640,
+        height: 480
+      });
+      camera.start();
+    }
+
+    // Etapa 3 — bolinha piscando e capturas
+    const posicoes = [
+      { x: 0.5, y: 0.5, nome: "centro" },
+      { x: 0.5, y: 0.05, nome: "cima" },
+      { x: 0.5, y: 0.95, nome: "baixo" },
+      { x: 0.03, y: 0.5, nome: "esquerda" },
+      { x: 0.97, y: 0.5, nome: "direita" }
+    ];
+
+    let etapa3Index = 0;
+    let anim3Req = null;
+
+    function loopBolinhaEtapa3() {
+      const lang = localStorage.getItem('selectedLanguage') || 'pt';
+      const canvas = document.getElementById("stage3");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const pos = posicoes[etapa3Index];
+      const on = (Math.floor(Date.now() / 400) % 2) === 0;
+
+      // Coordenadas da bolinha
+      const x = pos.x * canvas.width;
+      const y = pos.y * canvas.height;
+
+      // Bolinha piscando
+      ctx.fillStyle = on ? "red" : "rgba(255,0,0,0.2)";
+      ctx.beginPath();
+      ctx.arc(x, y, 30, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Texto próximo da bolinha (posição dinâmica)
+      ctx.fillStyle = "white";
+      ctx.font = "25px sans-serif";
+      ctx.textAlign = "center";
+
+      let textX = x;
+      let textY = y - 40; // padrão: acima
+
+      switch (pos.nome) {
+        case "esquerda":
+          textX = x + 80;
+          textY = y;
+          ctx.textAlign = "left";
+          break;
+        case "direita":
+          textX = x - 80;
+          textY = y;
+          ctx.textAlign = "right";
+          break;
+        case "cima":
+          textY = y + 60;
+          break;
+        case "baixo":
+          textY = y - 60;
+          break;
+        case "centro":
+          textY = y - 40;
+          break;
+      }
+
+      // Texto traduzido
+      ctx.fillText(translations[lang].feedback_fix_gaze, textX, textY);
+
+      if (document.getElementById("step3").classList.contains("active")) {
+        requestAnimationFrame(loopBolinhaEtapa3);
+      }
+    }
+
+
+    function iniciarEtapa3() {
+      etapa3Index = 0;
+      document.getElementById("captureBtn3").style.display = "inline";
+      document.getElementById("nextBtn3").style.display = "none";
+      loopBolinhaEtapa3();
+    }
+
+    function capturarEtapa3() {
+      const coords = window.coordenadasAtuais;
+      if (!coords) return;
+
+      const h = movimentoHorizontal(coords);
+      const v = movimentoVertical(coords);
+      const pos = posicoes[etapa3Index].nome;
+
+      window.valoresCalibrados[`olhar_left_eye_horizontal_${pos}`] = h.left_eye;
+      window.valoresCalibrados[`olhar_right_eye_horizontal_${pos}`] = h.right_eye;
+      window.valoresCalibrados[`olhar_left_eye_vertical_${pos}`] = v.left_eye;
+      window.valoresCalibrados[`olhar_right_eye_vertical_${pos}`] = v.right_eye;
+
+      etapa3Index++;
+      if (etapa3Index >= posicoes.length) {
+        document.getElementById("captureBtn3").style.display = "none";
+        document.getElementById("nextBtn3").style.display = "inline";
+      }
+    }
+
+    
+    // Variável global para posição simulada do mouse
+    let posicaoMouse = { x: 0.5, y: 0.5 };
+
+    function moverMousePorDirecao(ctx, largura, altura, eyeVertical, eyeHorizontal, ear, config, velocidade = 0.015) {
+    const raio = 20;
+
+    const centroH = config["olhar_left_eye_horizontal_centro"];
+    const centroV = config["olhar_left_eye_vertical_centro"];
+    const tolerancia = 0.02;
+
+    const valorHorizontal = eyeHorizontal?.left_eye;
+    const valorVertical = eyeVertical?.left_eye;
+
+    const earDireito = ear?.direito;
+    const earEsquerdo = ear?.esquerdo;
+
+    // Só move se EAR direito > 0.12 e EAR esquerdo <= 0.12
+    if (earDireito != null && earEsquerdo != null && earEsquerdo <= 0.12 && earDireito > 0.12) {
+        if (valorVertical < centroV - tolerancia) {
+        posicaoMouse.y -= velocidade;
+        } else if (valorVertical > centroV + tolerancia) {
+        posicaoMouse.y += velocidade;
+        }
+
+        if (valorHorizontal < centroH - tolerancia) {
+        posicaoMouse.x += velocidade;
+        } else if (valorHorizontal > centroH + tolerancia) {
+        posicaoMouse.x -= velocidade;
+        }
+
+        posicaoMouse.x = Math.max(0.0, Math.min(posicaoMouse.x, 1.0));
+        posicaoMouse.y = Math.max(0.0, Math.min(posicaoMouse.y, 1.0));
+        ctx.fillStyle = "green";
+        ctx.fillText(
+        `🛑 Movimento ativado | EAR D: ${earDireito?.toFixed(3)} | EAR E: ${earEsquerdo?.toFixed(3)}`,
+        30,
+        50
+        );
+    } else {
+        ctx.fillStyle = "red";
+        ctx.fillText(
+        `🛑 Movimento pausado | EAR D: ${earDireito?.toFixed(3)} | EAR E: ${earEsquerdo?.toFixed(3)}`,
+        30,
+        50
+        );
+    }
+
+    // Converter para pixel
+    let xPixel = Math.floor(posicaoMouse.x * largura);
+    let yPixel = Math.floor(posicaoMouse.y * altura);
+
+    // Evita cantos da tela (fail-safe)
+    xPixel = Math.max(10, Math.min(xPixel, largura - 20));
+    yPixel = Math.max(10, Math.min(yPixel, altura - 20));
+
+    // Sempre desenha a bolinha, mesmo pausado
+    ctx.fillStyle = "yellow";
+    ctx.beginPath();
+    ctx.arc(xPixel, yPixel, raio, 0, 2 * Math.PI);
+    ctx.fill();
+
+    ctx.fillStyle = "white";
+    ctx.fillText(`Mouse simulado: (${xPixel}, ${yPixel})`, 30, 30);
+    }
+
+    function mudarCorBolinhaPorDirecao(ctx, largura, altura, eyeVertical, eyeHorizontal, ear, config) {
+    const raio = 20;
+
+    const centroH = config["olhar_right_eye_horizontal_centro"];
+    const centroV = config["olhar_right_eye_vertical_centro"];
+    const tolerancia = 0.1;
+
+    const valorHorizontal = eyeHorizontal?.right_eye;
+    const valorVertical = eyeVertical?.right_eye;
+
+    const earDireito = ear?.direito;
+    const earEsquerdo = ear?.esquerdo;
+
+    let corBolinha = "gray";
+
+    // Só muda cor se EAR esquerdo <= 0.12 e EAR direito > 0.12
+    if (earDireito != null && earEsquerdo != null && earEsquerdo > 0.12 && earDireito <= 0.12) {
+        // centro e tolerância
+        const centroH = config["olhar_right_eye_horizontal_centro"];
+        const centroV = config["olhar_right_eye_vertical_centro"];
+
+        // Direção horizontal
+        if (valorHorizontal < centroH - tolerancia) {
+        corBolinha = "green"; // olhando para esquerda
+        } else if (valorHorizontal > centroH + tolerancia) {
+        corBolinha = "red";   // olhando para direita
+        }
+
+        // Direção vertical
+        if (valorVertical < centroV - tolerancia) {
+        corBolinha = "blue";  // olhando para cima
+        } else if (valorVertical > centroV + tolerancia) {
+        corBolinha = "orange"; // olhando para baixo
+        }
+
+        ctx.fillStyle = "green";
+        ctx.fillText(
+        `🎨 Cor ativada | EAR D: ${earDireito?.toFixed(3)} | EAR E: ${earEsquerdo?.toFixed(3)}`,
+        30,
+        60
+        );
+
+        ctx.fillText(
+        `🎨 Cor ativada | H: ${valorHorizontal?.toFixed(3)} | V: ${valorVertical?.toFixed(3)}`,
+        30,
+        70
+        );
+    } else {
+        ctx.fillStyle = "red";
+        ctx.fillText(
+        `🎨 Cor pausada | EAR D: ${earDireito?.toFixed(3)} | EAR E: ${earEsquerdo?.toFixed(3)}`,
+        30,
+        60
+        );
+        ctx.fillText(
+        `🎨 Cor pausada | H: ${valorHorizontal?.toFixed(3)} | V: ${valorVertical?.toFixed(3)}`,
+        30,
+        70
+        );
+    }
+
+    // Converter para pixel (usa mesma posição da bolinha simulada)
+    let xPixel = Math.floor(posicaoMouse.x * largura);
+    let yPixel = Math.floor(posicaoMouse.y * altura);
+
+    // Evita cantos da tela (fail-safe)
+    xPixel = Math.max(10, Math.min(xPixel, largura - 20));
+    yPixel = Math.max(10, Math.min(yPixel, altura - 20));
+
+    // Desenhar bolinha com cor atual
+    ctx.fillStyle = corBolinha;
+    ctx.beginPath();
+    ctx.arc(xPixel, yPixel, raio, 0, 2 * Math.PI);
+    ctx.fill();
+
+    ctx.fillStyle = "white";
+    ctx.fillText(`Cor da bolinha: ${corBolinha}`, 30, 100);
+        ctx.fillText(
+        `🎨 Centro | X: ${centroH?.toFixed(3)} | Y: ${centroV?.toFixed(3)}`,
+        30,
+        90
+        );
+    }
+    // Loop da Etapa 4
+    function loopEtapa4() {
+    const canvas = document.getElementById("stage4");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext("2d");
+
+    if (window.coordenadasAtuais) {
+        const h = movimentoHorizontal(window.coordenadasAtuais);
+        const v = movimentoVertical(window.coordenadasAtuais);
+        const ear = calcularEAR(window.coordenadasAtuais);
+
+        // Primeiro movimenta a bolinha (mouse simulado)
+        moverMousePorDirecao(ctx, canvas.width, canvas.height, v, h, ear, window.valoresCalibrados, velocidade = 0.002);
+
+        // Depois muda a cor da bolinha conforme direção
+        mudarCorBolinhaPorDirecao(ctx, canvas.width, canvas.height, v, h, ear, window.valoresCalibrados);
+    }
+
+    if (document.getElementById("step4").classList.contains("active")) {
+        requestAnimationFrame(loopEtapa4);
+    }
+    }
+
+
+
+    // Liga botões
+    window.onload = () => {
+      iniciarFaceMesh();
+
+      // Etapa 1
+      document.getElementById('captureBtn1').onclick = capturarDistancia;
+      document.getElementById('nextBtn1').onclick = () => nextStep(2);
+
+      // Etapa 2
+      document.getElementById('captureOpen').onclick = capturarOlhosAbertos;
+      document.getElementById('captureClosed').onclick = capturarOlhosFechados;
+      document.getElementById('nextBtn2').onclick = () => {
+        nextStep(3);
+        iniciarEtapa3();
+      };
+
+      // Etapa 3
+      document.getElementById('captureBtn3').onclick = capturarEtapa3;
+      
+      // Avançar da Etapa 3 para Etapa 4
+      document.getElementById('nextBtn3').onclick = () => {
+        nextStep(4);
+        loopEtapa4();
+      };
+
+      // Etapa 4 - botões
+      document.getElementById('finalizarBtn').onclick = () => {
+        console.log("Calibração finalizada ✅", window.valoresCalibrados);
+        alert("Calibração concluída! Os valores foram salvos.");
+        // salva no localStorage
+        localStorage.setItem("valoresCalibrados", JSON.stringify(window.valoresCalibrados));
+        // depois redireciona
+        location.href = '4 - move_bolinha.html';
+      };
+
+
+      document.getElementById('repetirBtn').onclick = () => {
+      window.valoresCalibrados = {
+            distancia_minima: null,
+            ear_aberto: null,
+            ear_fechado: null
+      };
+        etapa3Index = 0;
+        nextStep(1);
+      };
+
+
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <title>EyeClick - Resultados</title>
+  <script src="traducao.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 20px;
+      color: #fff;
+    }
+    table, th, td {
+      border: 1px solid #fff;
+      padding: 8px;
+      text-align: center;
+    }
+    #nextButton {
+      margin-top: 20px;
+      font-size: 1.2em;
+      background: #444;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2 id="resultsTitle">Resultados do Experimento</h2>
+  <p id="resultsText">Copie e cole os valores abaixo no formulário:</p>
+  <div id="results"></div>
+  <button id="nextButton">Ir para Agradecimentos</button>
+
+  <script>
+    // Função específica para traduzir esta página
+    function updateResultsTexts(lang) {
+      if (document.getElementById('resultsTitle')) {
+        document.getElementById('resultsTitle').textContent = translations[lang].resultsTitle;
+      }
+      if (document.getElementById('resultsText')) {
+        document.getElementById('resultsText').textContent = translations[lang].resultsText;
+      }
+      if (document.getElementById('nextButton')) {
+        document.getElementById('nextButton').textContent = translations[lang].next_button_results;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const lang = localStorage.getItem("selectedLanguage") || "pt";
+      updateResultsTexts(lang);
+
+      const resultados = JSON.parse(localStorage.getItem("resultadosExperimento")) || [];
+      let html = "<table><tr><th>Nº Quadrado</th><th>Tempo (s)</th><th>X</th><th>Y</th></tr>";
+      resultados.forEach(t => {
+        html += `<tr><td>${t.numero}</td><td>${t.tempo}</td><td>${t.x}</td><td>${t.y}</td></tr>`;
+      });
+      html += "</table>";
+      document.getElementById("results").innerHTML = html;
+    });
+
+    document.getElementById("nextButton").addEventListener("click", () => {
+      location.href = "6 - agradecimentos.html";
+    });
+  </script>
+</body>
+</html>
