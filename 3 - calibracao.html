@@ -478,7 +478,7 @@
     // Variável global para posição simulada do mouse
     let posicaoMouse = { x: 0.5, y: 0.5 };
 
-    function moverMousePorDirecao(ctx, largura, altura, eyeVertical, eyeHorizontal, ear, config, velocidade = 0.015) {
+    function moverMousePorDirecao(ctx, largura, altura, eyeVertical, eyeHorizontal, ear, config, velocidade = 0.0007) {
     const raio = 20;
 
     const centroH = config["olhar_left_eye_horizontal_centro"];
@@ -636,7 +636,7 @@
         const ear = calcularEAR(window.coordenadasAtuais);
 
         // Primeiro movimenta a bolinha (mouse simulado)
-        moverMousePorDirecao(ctx, canvas.width, canvas.height, v, h, ear, window.valoresCalibrados, velocidade = 0.002);
+        moverMousePorDirecao(ctx, canvas.width, canvas.height, v, h, ear, window.valoresCalibrados, velocidade = 0.0007);
 
         // Depois muda a cor da bolinha conforme direção
         mudarCorBolinhaPorDirecao(ctx, canvas.width, canvas.height, v, h, ear, window.valoresCalibrados);
@@ -700,4 +700,5 @@
   </script>
 </body>
 </html>
+
 
